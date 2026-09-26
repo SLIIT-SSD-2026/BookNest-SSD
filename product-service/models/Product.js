@@ -34,7 +34,14 @@ const productSchema = new mongoose.Schema({
   isbn: {
     type: String,
     unique: true,
-    sparse: true
+    sparse: true,
+    validate: {
+      validator: function(v) {
+        if (!v) return true;
+        return /^[0-9xX-]{10,17}$/.test(v);
+      },
+      message: 'Invalid ISBN format. Must be 10-17 alphanumeric characters or hyphens.'
+    }
   },
   publisher: {
     type: String,
