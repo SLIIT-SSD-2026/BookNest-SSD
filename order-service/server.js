@@ -29,10 +29,23 @@ const limiter = rateLimit({
 app.use('/api', limiter);
 
 // CORS configuration
+const allowedOrigins = ['http://localhost:3000'];
+if (process.env.CORS_ORIGIN && process.env.CORS_ORIGIN !== '*') {
+  if (!allowedOrigins.includes(process.env.CORS_ORIGIN)) {
+    allowedOrigins.push(process.env.CORS_ORIGIN);
+  }
+}
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Blocked by CORS policy'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
 }));
 
 // Body parsing middleware

@@ -7,7 +7,24 @@ import { authenticateToken, authorizeRole } from './middleware/auth.js';
 dotenv.config();
 const app = express();
 
-app.use(cors());
+const allowedOrigins = ['http://localhost:3000'];
+if (process.env.CORS_ORIGIN && process.env.CORS_ORIGIN !== '*') {
+  if (!allowedOrigins.includes(process.env.CORS_ORIGIN)) {
+    allowedOrigins.push(process.env.CORS_ORIGIN);
+  }
+}
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Blocked by CORS policy'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
+}));
 
 // Auth Service (Public)
 app.use('/api/auth', createProxyMiddleware({
