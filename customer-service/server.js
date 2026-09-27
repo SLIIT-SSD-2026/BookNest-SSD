@@ -7,6 +7,8 @@ import customerRoutes from './routes/customerRoutes.js';
 dotenv.config();
 const app = express();
 
+app.disable('x-powered-by');
+
 // Middleware
 const allowedOrigins = ['http://localhost:3000'];
 if (process.env.CORS_ORIGIN && process.env.CORS_ORIGIN !== '*') {
@@ -29,7 +31,7 @@ app.use(cors({
 app.use(express.json());
 
 // Routes
-app.use('/', customerRoutes);
+app.use('/api/customers', customerRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

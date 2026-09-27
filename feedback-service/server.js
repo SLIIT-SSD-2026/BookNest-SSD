@@ -8,7 +8,10 @@ import Feedback from './models/Feedback.js';
 dotenv.config();
 const app = express();
 
+app.disable('x-powered-by');
+
 const allowedOrigins = ['http://localhost:3000'];
+
 if (process.env.CORS_ORIGIN && process.env.CORS_ORIGIN !== '*') {
   if (!allowedOrigins.includes(process.env.CORS_ORIGIN)) {
     allowedOrigins.push(process.env.CORS_ORIGIN);
@@ -17,7 +20,7 @@ if (process.env.CORS_ORIGIN && process.env.CORS_ORIGIN !== '*') {
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+    if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Blocked by CORS policy'));

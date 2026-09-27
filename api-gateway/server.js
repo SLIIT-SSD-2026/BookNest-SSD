@@ -2,47 +2,90 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { authenticateToken, authorizeRole } from './middleware/auth.js';
 
 dotenv.config();
 const app = express();
 
-// Keep Helmet headers from development
-// CWE-1021: refuse to be embedded in a cross-origin iframe.
-app.use(helmet.frameguard({ action: 'sameorigin' }));
-// CWE-693: tell browsers to honor the declared Content-Type.
+app.disable('x-powered-by');
+
+// Authentication rate limiter
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: {
+    success: false,
+    message: 'Too many login attempts. Please try again later.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// Apply rate limiting to the login endpoint
+app.use('/api/auth/login', loginLimiter);
+
+// Security headers
+app.use(
+  helmet.contentSecurityPolicy({
+    directives: {
+      defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'self'"],
+      objectSrc: ["'none'"],
+      scriptSrc: ["'self'"],
+      scriptSrcAttr: ["'none'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:"],
+      connectSrc: [
+        "'self'",
+        "http://localhost:5000",
+        "http://localhost:3000"
+      ]
+    }
+  })
+);
+
+// Prevent MIME-type sniffing
 app.use(helmet.noSniff());
 
-// Keep custom CORS setup from IT22085726
+// Prevent cross-origin framing
+app.use(helmet.frameguard({ action: 'sameorigin' }));
+
+// CORS configuration
 const allowedOrigins = ['http://localhost:3000'];
+
 if (process.env.CORS_ORIGIN && process.env.CORS_ORIGIN !== '*') {
   if (!allowedOrigins.includes(process.env.CORS_ORIGIN)) {
     allowedOrigins.push(process.env.CORS_ORIGIN);
   }
 }
 
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Blocked by CORS policy'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
-}));
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Blocked by CORS policy'));
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
+  })
+);
 
-// Keep attachBearerToken helper from development
+// Attach bearer token to proxied requests
 const attachBearerToken = (proxyReq, req) => {
   if (req.token) {
     proxyReq.setHeader('Authorization', `Bearer ${req.token}`);
   }
 };
 
-
-// Auth Service (Public)
+// Auth Service (Public with login rate limiting)
+app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth', createProxyMiddleware({
   target: process.env.AUTH_SERVICE_URL,
   changeOrigin: true,

@@ -2,10 +2,22 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import mongoose from 'mongoose';
+import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/authRoutes.js';
 
 dotenv.config();
 const app = express();
+
+app.disable('x-powered-by');
+
+// Rate limiting middleware
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15-minute observation window
+  max: 5, // Maximum 5 attempts per IP
+  message: { success: false, message: "Too many login attempts. Please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false
+});
 
 // Middleware
 const allowedOrigins = ['http://localhost:3000'];
@@ -27,6 +39,10 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
 }));
 app.use(express.json());
+
+// Apply rate limiter to login endpoints
+app.use('/api/auth/login', loginLimiter);
+app.use('/login', loginLimiter);
 
 // Routes
 app.use('/', authRoutes);

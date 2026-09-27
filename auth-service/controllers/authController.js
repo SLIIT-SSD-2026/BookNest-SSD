@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
+import validator from 'validator';
 import User from '../models/User.js';
 import Blacklist from '../models/Blacklist.js';
 
@@ -129,6 +130,28 @@ export const registerUser = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Please provide all required fields: name, email, password'
+      });
+    }
+
+    // Validate role
+    if (!['customer', 'seller'].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Role must be either "customer" or "seller"'
+      });
+    }
+
+    // Validate password complexity
+    if (!validator.isStrongPassword(password, {
+      minLength: 8,
+      minLowercase: 1,
+      minUppercase: 1,
+      minNumbers: 1,
+      minSymbols: 1
+    })) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 8 characters long and contain uppercase, lowercase, numbers, and symbols.'
       });
     }
 

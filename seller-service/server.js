@@ -7,6 +7,8 @@ import sellerRoutes from './routes/sellerRoutes.js';
 dotenv.config();
 const app = express();
 
+app.disable('x-powered-by');
+
 // Middleware
 const allowedOrigins = ['http://localhost:3000'];
 if (process.env.CORS_ORIGIN && process.env.CORS_ORIGIN !== '*') {
