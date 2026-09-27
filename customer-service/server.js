@@ -7,6 +7,8 @@ import customerRoutes from './routes/customerRoutes.js';
 dotenv.config();
 const app = express();
 
+app.disable('x-powered-by');
+
 // Middleware
 app.use(cors());
 app.use(express.json());

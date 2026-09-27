@@ -7,6 +7,8 @@ const productRoutes = require('./routes/productRoutes');
 
 const app = express();
 
+app.disable('x-powered-by');
+
 // Avoid hanging requests when DB is unavailable.
 mongoose.set('bufferCommands', false);
 mongoose.set('bufferTimeoutMS', 5000);

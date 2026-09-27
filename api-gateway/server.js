@@ -1,11 +1,24 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import helmet from 'helmet';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { authenticateToken, authorizeRole } from './middleware/auth.js';
 
 dotenv.config();
 const app = express();
+
+app.disable('x-powered-by');
+
+app.use(helmet.contentSecurityPolicy({
+  directives: {
+    defaultSrc: ["'self'"],
+    scriptSrc: ["'self'"],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    imgSrc: ["'self'", "data:", "https:"],
+    connectSrc: ["'self'", "http://localhost:5000", "http://localhost:3000"]
+  }
+}));
 
 app.use(cors());
 

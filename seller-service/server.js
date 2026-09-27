@@ -7,6 +7,8 @@ import sellerRoutes from './routes/sellerRoutes.js';
 dotenv.config();
 const app = express();
 
+app.disable('x-powered-by');
+
 // Middleware
 app.use(cors());
 app.use(express.json());

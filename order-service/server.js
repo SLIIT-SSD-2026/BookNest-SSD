@@ -11,6 +11,7 @@ import orderRoutes from './routes/orderRoutes.js';
 dotenv.config();
 
 const app = express();
+app.disable('x-powered-by');
 const PORT = process.env.PORT;
 
 // Security middleware
