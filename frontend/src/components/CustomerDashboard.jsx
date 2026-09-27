@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { endSession } from '../utils/api';
 
 export default function CustomerDashboard() {
   const [user] = useState(() => {
@@ -9,9 +10,7 @@ export default function CustomerDashboard() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-
-    if (!token || !user) {
+    if (!user) {
       navigate('/login');
       return;
     }
@@ -21,9 +20,8 @@ export default function CustomerDashboard() {
     }
   }, [navigate, user]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  const handleLogout = async () => {
+    await endSession();
     navigate('/');
   };
 

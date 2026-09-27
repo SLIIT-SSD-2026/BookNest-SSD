@@ -1,8 +1,30 @@
 import jwt from 'jsonwebtoken';
 
+const readRequestToken = (req) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.slice('Bearer '.length).trim();
+  }
+
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) {
+    return null;
+  }
+
+  const tokenPart = cookieHeader
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith('token='));
+
+  if (!tokenPart) {
+    return null;
+  }
+
+  return decodeURIComponent(tokenPart.slice('token='.length));
+};
+
 export const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const token = readRequestToken(req);
 
   if (!token) {
     return res.status(401).json({
@@ -14,6 +36,7 @@ export const authenticateToken = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
+    req.token = token;
     next();
   } catch (error) {
     return res.status(403).json({
