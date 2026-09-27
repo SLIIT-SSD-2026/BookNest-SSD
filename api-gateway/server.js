@@ -1,6 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import helmet from 'helmet';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { authenticateToken, authorizeRole } from './middleware/auth.js';
 
@@ -8,6 +9,10 @@ dotenv.config();
 const app = express();
 
 app.use(cors());
+// CWE-1021: refuse to be embedded in a cross-origin iframe.
+app.use(helmet.frameguard({ action: 'sameorigin' }));
+// CWE-693: tell browsers to honor the declared Content-Type.
+app.use(helmet.noSniff());
 
 // Auth Service (Public)
 app.use('/api/auth', createProxyMiddleware({
