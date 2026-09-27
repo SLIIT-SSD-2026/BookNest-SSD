@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const validator = require('validator');
 const Product = require('../models/Product');
 const {
   getRelevantFeedbackForProduct,
@@ -9,10 +10,52 @@ const {
   getSellerByUserId
 } = require('../services/sellerService');
 
+// Helper to sanitize text fields by escaping HTML tags (<, >, &, ", ')
+const sanitizeText = (str) => {
+  if (typeof str !== 'string') return str;
+  return validator.escape(str.trim());
+};
+
+// Helper to validate ISBN format (e.g., ^[0-9X-]{10,17}$)
+const validateIsbn = (isbn) => {
+  if (!isbn) return true;
+  return /^[0-9xX-]{10,17}$/.test(String(isbn).trim());
+};
+
+// Helper to sanitize product body payload
+const sanitizeProductPayload = (payload) => {
+  const data = { ...payload };
+
+  const textFields = ['title', 'author', 'description', 'category', 'publisher', 'language'];
+  textFields.forEach((field) => {
+    if (data[field] && typeof data[field] === 'string') {
+      data[field] = sanitizeText(data[field]);
+    }
+  });
+
+  if (data.isbn && typeof data.isbn === 'string') {
+    data.isbn = data.isbn.trim();
+  }
+
+  if (data.coverImage && typeof data.coverImage === 'string') {
+    data.coverImage = data.coverImage.trim();
+  }
+
+  return data;
+};
+
 // Create a new product
 exports.createProduct = async (req, res) => {
   try {
-    const product = new Product(req.body);
+    if (req.body.isbn && !validateIsbn(req.body.isbn)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid ISBN format. Must be 10 to 17 alphanumeric characters or hyphens.'
+      });
+    }
+
+    const sanitizedBody = sanitizeProductPayload(req.body);
+    const product = new Product(sanitizedBody);
     await product.save();
     res.status(201).json({
       success: true,
@@ -160,9 +203,18 @@ exports.updateProduct = async (req, res) => {
       }
     }
 
+    if (req.body.isbn && !validateIsbn(req.body.isbn)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid ISBN format. Must be 10 to 17 alphanumeric characters or hyphens.'
+      });
+    }
+
+    const sanitizedBody = sanitizeProductPayload(req.body);
+
     const product = await Product.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      sanitizedBody,
       { new: true, runValidators: true }
     );
     

@@ -29,10 +29,23 @@ const limiter = rateLimit({
 app.use('/api', limiter);
 
 // CORS configuration
+const allowedOrigins = ['http://localhost:3000'];
+if (process.env.CORS_ORIGIN && process.env.CORS_ORIGIN !== '*') {
+  if (!allowedOrigins.includes(process.env.CORS_ORIGIN)) {
+    allowedOrigins.push(process.env.CORS_ORIGIN);
+  }
+}
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Blocked by CORS policy'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
 }));
 
 // Body parsing middleware
@@ -80,14 +93,18 @@ app.use((req, res) => {
   });
 });
 
-// Global error handler
+// Centralized error handler
 app.use((err, req, res, next) => {
-  console.error('Global error:', err.stack);
-  
-  res.status(err.status || 500).json({
+  // Log full debug info internally
+  console.error(`[Error] ${req.method} ${req.url}:`, err.stack);
+
+  // Return a generic, sanitized error structure to clients
+  const statusCode = err.statusCode || err.status || 500;
+  res.status(statusCode).json({
     success: false,
-    message: err.message || 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    message: statusCode === 500
+      ? "An internal server error occurred. Please contact support."
+      : err.message
   });
 });
 
