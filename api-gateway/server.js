@@ -14,6 +14,12 @@ app.use(helmet.frameguard({ action: 'sameorigin' }));
 // CWE-693: tell browsers to honor the declared Content-Type.
 app.use(helmet.noSniff());
 
+const attachBearerToken = (proxyReq, req) => {
+  if (req.token) {
+    proxyReq.setHeader('Authorization', `Bearer ${req.token}`);
+  }
+};
+
 // Auth Service (Public)
 app.use('/api/auth', createProxyMiddleware({
   target: process.env.AUTH_SERVICE_URL,
@@ -25,7 +31,8 @@ app.use('/api/customers',
   authenticateToken, 
   createProxyMiddleware({
     target: process.env.CUSTOMER_SERVICE_URL,
-    changeOrigin: true,    
+    changeOrigin: true,
+    on: { proxyReq: attachBearerToken }
   })
 );
 
@@ -36,6 +43,7 @@ app.use('/api/sellers',
   createProxyMiddleware({
     target: process.env.SELLER_SERVICE_URL,
     changeOrigin: true,
+    on: { proxyReq: attachBearerToken }
   })
 );
 
@@ -47,8 +55,11 @@ app.use(
   createProxyMiddleware({
     target: process.env.PRODUCT_SERVICE_URL,
     changeOrigin: true,
-    onProxyReq: (proxyReq, req, res) => {
-      console.log(`[${new Date().toISOString()}] Proxying ${req.method} ${req.url} to PRODUCT SERVICE`);
+    on: {
+      proxyReq: (proxyReq, req) => {
+        attachBearerToken(proxyReq, req);
+        console.log(`[${new Date().toISOString()}] Proxying ${req.method} ${req.url} to PRODUCT SERVICE`);
+      }
     }
   })
 );
@@ -59,6 +70,7 @@ app.use('/api/feedback',
   createProxyMiddleware({
     target: process.env.FEEDBACK_SERVICE_URL,
     changeOrigin: true,
+    on: { proxyReq: attachBearerToken }
   })
 );
 
@@ -69,6 +81,7 @@ app.use('/api/orders',
   createProxyMiddleware({
     target: process.env.ORDER_SERVICE_URL,
     changeOrigin: true,
+    on: { proxyReq: attachBearerToken }
   })
 );
 
