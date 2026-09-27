@@ -38,6 +38,21 @@ app.get('/health', (_req, res) => {
   });
 });
 
+// Centralized error handler
+app.use((err, req, res, next) => {
+  // Log full debug info internally
+  console.error(`[Error] ${req.method} ${req.url}:`, err.stack);
+
+  // Return a generic, sanitized error structure to clients
+  const statusCode = err.statusCode || err.status || 500;
+  res.status(statusCode).json({
+    success: false,
+    message: statusCode === 500
+      ? "An internal server error occurred. Please contact support."
+      : err.message
+  });
+});
+
 const start = async () => {
   try {
     if (!process.env.MONGO_URI) {

@@ -49,10 +49,19 @@ app.get('/health', (req, res) => {
 // Therefore we mount the product routes at the root.
 app.use('/', productRoutes);
 
-// Error handling middleware
+// Centralized error handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong!' });
+  // Log full debug info internally
+  console.error(`[Error] ${req.method} ${req.url}:`, err.stack);
+
+  // Return a generic, sanitized error structure to clients
+  const statusCode = err.statusCode || err.status || 500;
+  res.status(statusCode).json({
+    success: false,
+    message: statusCode === 500
+      ? "An internal server error occurred. Please contact support."
+      : err.message
+  });
 });
 
 const PORT = process.env.PORT;
