@@ -2,6 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { authenticateToken, authorizeRole } from './middleware/auth.js';
 
@@ -9,6 +10,15 @@ dotenv.config();
 const app = express();
 
 app.disable('x-powered-by');
+
+// Authentication rate limiter
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15-minute observation window
+  max: 5, // Maximum 5 attempts per IP
+  message: { success: false, message: "Too many login attempts. Please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false
+});
 
 app.use(helmet.contentSecurityPolicy({
   directives: {
@@ -22,7 +32,8 @@ app.use(helmet.contentSecurityPolicy({
 
 app.use(cors());
 
-// Auth Service (Public)
+// Auth Service (Public with login rate limiting)
+app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth', createProxyMiddleware({
   target: process.env.AUTH_SERVICE_URL,
   changeOrigin: true,
