@@ -3,6 +3,7 @@ import MyBooks from './MyBooks';
 import EditBookForm from './EditBookForm';
 import CustomerOrders from './CustomerOrders';
 import { useNavigate } from 'react-router-dom';
+import { endSession } from '../utils/api';
 
 export default function SellerDashboard() {
   const [user] = useState(() => {
@@ -14,9 +15,7 @@ export default function SellerDashboard() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-
-    if (!token || !user) {
+    if (!user) {
       navigate('/login');
       return;
     }
@@ -26,9 +25,8 @@ export default function SellerDashboard() {
     }
   }, [navigate, user]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  const handleLogout = async () => {
+    await endSession();
     navigate('/');
   };
 

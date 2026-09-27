@@ -1,12 +1,20 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import helmet from 'helmet';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { authenticateToken, authorizeRole } from './middleware/auth.js';
 
 dotenv.config();
 const app = express();
 
+// Keep Helmet headers from development
+// CWE-1021: refuse to be embedded in a cross-origin iframe.
+app.use(helmet.frameguard({ action: 'sameorigin' }));
+// CWE-693: tell browsers to honor the declared Content-Type.
+app.use(helmet.noSniff());
+
+// Keep custom CORS setup from IT22085726
 const allowedOrigins = ['http://localhost:3000'];
 if (process.env.CORS_ORIGIN && process.env.CORS_ORIGIN !== '*') {
   if (!allowedOrigins.includes(process.env.CORS_ORIGIN)) {
@@ -26,6 +34,14 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
 }));
 
+// Keep attachBearerToken helper from development
+const attachBearerToken = (proxyReq, req) => {
+  if (req.token) {
+    proxyReq.setHeader('Authorization', `Bearer ${req.token}`);
+  }
+};
+
+
 // Auth Service (Public)
 app.use('/api/auth', createProxyMiddleware({
   target: process.env.AUTH_SERVICE_URL,
@@ -37,7 +53,8 @@ app.use('/api/customers',
   authenticateToken, 
   createProxyMiddleware({
     target: process.env.CUSTOMER_SERVICE_URL,
-    changeOrigin: true,    
+    changeOrigin: true,
+    on: { proxyReq: attachBearerToken }
   })
 );
 
@@ -48,6 +65,7 @@ app.use('/api/sellers',
   createProxyMiddleware({
     target: process.env.SELLER_SERVICE_URL,
     changeOrigin: true,
+    on: { proxyReq: attachBearerToken }
   })
 );
 
@@ -59,8 +77,11 @@ app.use(
   createProxyMiddleware({
     target: process.env.PRODUCT_SERVICE_URL,
     changeOrigin: true,
-    onProxyReq: (proxyReq, req, res) => {
-      console.log(`[${new Date().toISOString()}] Proxying ${req.method} ${req.url} to PRODUCT SERVICE`);
+    on: {
+      proxyReq: (proxyReq, req) => {
+        attachBearerToken(proxyReq, req);
+        console.log(`[${new Date().toISOString()}] Proxying ${req.method} ${req.url} to PRODUCT SERVICE`);
+      }
     }
   })
 );
@@ -71,6 +92,7 @@ app.use('/api/feedback',
   createProxyMiddleware({
     target: process.env.FEEDBACK_SERVICE_URL,
     changeOrigin: true,
+    on: { proxyReq: attachBearerToken }
   })
 );
 
@@ -81,6 +103,7 @@ app.use('/api/orders',
   createProxyMiddleware({
     target: process.env.ORDER_SERVICE_URL,
     changeOrigin: true,
+    on: { proxyReq: attachBearerToken }
   })
 );
 

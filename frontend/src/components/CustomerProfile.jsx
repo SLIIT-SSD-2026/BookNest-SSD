@@ -12,10 +12,9 @@ export default function CustomerProfile() {
   const { customerId } = useParams();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
 
-    if (!token || !userData) {
+    if (!userData) {
       navigate('/login');
       return;
     }
