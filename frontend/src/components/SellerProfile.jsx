@@ -10,10 +10,9 @@ export default function SellerProfile() {
   const { sellerId } = useParams();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
-    
-    if (!token || !userData) {
+
+    if (!userData) {
       navigate('/login');
       return;
     }

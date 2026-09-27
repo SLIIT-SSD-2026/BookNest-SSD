@@ -20,7 +20,24 @@ const loginLimiter = rateLimit({
 });
 
 // Middleware
-app.use(cors());
+const allowedOrigins = ['http://localhost:3000'];
+if (process.env.CORS_ORIGIN && process.env.CORS_ORIGIN !== '*') {
+  if (!allowedOrigins.includes(process.env.CORS_ORIGIN)) {
+    allowedOrigins.push(process.env.CORS_ORIGIN);
+  }
+}
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Blocked by CORS policy'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
+}));
 app.use(express.json());
 
 // Apply rate limiter to login endpoints
@@ -29,6 +46,21 @@ app.use('/login', loginLimiter);
 
 // Routes
 app.use('/', authRoutes);
+
+// Centralized error handler
+app.use((err, req, res, next) => {
+  // Log full debug info internally
+  console.error(`[Error] ${req.method} ${req.url}:`, err.stack);
+
+  // Return a generic, sanitized error structure to clients
+  const statusCode = err.statusCode || err.status || 500;
+  res.status(statusCode).json({
+    success: false,
+    message: statusCode === 500
+      ? "An internal server error occurred. Please contact support."
+      : err.message
+  });
+});
 
 const start = async () => {
   try {

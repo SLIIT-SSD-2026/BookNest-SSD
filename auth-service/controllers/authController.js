@@ -11,6 +11,47 @@ const generateToken = (userId, role) => {
   });
 };
 
+const authCookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict',
+  path: '/'
+};
+
+const setAuthCookie = (res, token) => {
+  res.cookie('token', token, {
+    ...authCookieOptions,
+    maxAge: 3600000
+  });
+};
+
+const clearAuthCookie = (res) => {
+  res.clearCookie('token', authCookieOptions);
+};
+
+const readRequestToken = (req) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return authHeader.slice('Bearer '.length).trim();
+  }
+
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) {
+    return null;
+  }
+
+  const tokenPart = cookieHeader
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith('token='));
+
+  if (!tokenPart) {
+    return null;
+  }
+
+  return decodeURIComponent(tokenPart.slice('token='.length));
+};
+
 // Normalize the customer service base URL (removes trailing slash and /api/customers if present)
 const normalizeCustomerServiceBase = () => {
   let base = (process.env.CUSTOMER_SERVICE_URL || '').trim().replace(/\/$/, '');
@@ -79,10 +120,10 @@ const createSellerProfile = async (user) => {
   }
 };
 
-// Register a new user (customer or seller)
+// Register a new user
 export const registerUser = async (req, res) => {
   try {
-    const { name, email, password, role = 'customer' } = req.body;
+    const { name, email, password } = req.body;
 
     // Check if all required fields are provided
     if (!name || !email || !password) {
@@ -125,10 +166,10 @@ export const registerUser = async (req, res) => {
 
     // Create new user
     const newUser = new User({
-      name,
-      email,
+      name: name.trim(),
+      email: email.trim(),
       password,
-      role
+      role: 'customer'
     });
 
     await newUser.save();
@@ -136,25 +177,17 @@ export const registerUser = async (req, res) => {
     // Fetch the saved user to ensure userId is populated
     const savedUser = await User.findById(newUser._id);
     
-    // Create customer profile if user is a customer
-    if (savedUser.role === 'customer') {
-      await createCustomerProfile(savedUser);
-    }
-    
-    // Create seller profile if user is a seller
-    if (savedUser.role === 'seller') {
-      await createSellerProfile(savedUser);
-    }
+    // Create customer profile
+    await createCustomerProfile(savedUser);
 
-    // Generate token
     const token = generateToken(savedUser.userId, savedUser.role);
+    setAuthCookie(res, token);
 
     res.status(201).json({
       success: true,
-      message: `${role.charAt(0).toUpperCase() + role.slice(1)} registered successfully`,
+      message: 'Customer registered successfully',
       data: {
-        user: savedUser,
-        token
+        user: savedUser
       }
     });
 
@@ -232,8 +265,8 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    // Generate token
     const token = generateToken(user.userId, user.role);
+    setAuthCookie(res, token);
 
     // Remove password from response
     user.password = undefined;
@@ -242,8 +275,7 @@ export const loginUser = async (req, res) => {
       success: true,
       message: 'Login successful',
       data: {
-        user,
-        token
+        user
       }
     });
 
@@ -260,8 +292,7 @@ export const loginUser = async (req, res) => {
 // Verify token (for other microservices)
 export const verifyToken = async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = readRequestToken(req);
 
     if (!token) {
       return res.status(401).json({
@@ -326,10 +357,10 @@ export const verifyToken = async (req, res) => {
 // Logout user (blacklist token)
 export const logoutUser = async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = readRequestToken(req);
 
     if (!token) {
+      clearAuthCookie(res);
       return res.status(400).json({
         success: false,
         message: 'No token provided'
@@ -346,6 +377,7 @@ export const logoutUser = async (req, res) => {
     });
 
     await blacklistedToken.save();
+    clearAuthCookie(res);
 
     res.status(200).json({
       success: true,
@@ -353,6 +385,8 @@ export const logoutUser = async (req, res) => {
     });
 
   } catch (error) {
+    clearAuthCookie(res);
+
     if (error.name === 'JsonWebTokenError') {
       return res.status(400).json({
         success: false,

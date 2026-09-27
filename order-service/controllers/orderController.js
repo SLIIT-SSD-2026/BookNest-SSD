@@ -94,7 +94,9 @@ export const getOrders = async (req, res) => {
  */
 export const createOrder = async (req, res) => {
   try {
-    const { customerId, items, shippingAddress, paymentMethod, notes } = req.body;
+    const { items, shippingAddress, paymentMethod, notes } = req.body;
+    // Enforce tenant identity for customers to prevent IDOR
+    const customerId = req.user?.role === 'customer' ? req.user.userId : req.body.customerId;
 
     // Validate required fields
     if (!customerId || !items || !items.length || !shippingAddress) {
@@ -217,6 +219,16 @@ export const updateOrderStatus = async (req, res) => {
       });
     }
 
+    // Customers can only cancel their own pending orders
+    if (req.user?.role === 'customer') {
+      if (status !== 'cancelled' || order.status !== 'pending') {
+        return res.status(403).json({
+          success: false,
+          message: 'Customers can only cancel pending orders'
+        });
+      }
+    }
+
     // Update status if provided
     if (status) {
       order.status = status;
@@ -281,6 +293,14 @@ export const updateOrder = async (req, res) => {
       return res.status(403).json({
         success: false,
         message: 'Access denied for this order'
+      });
+    }
+
+    // Customers can only edit pending orders
+    if (req.user?.role === 'customer' && order.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only pending orders can be edited'
       });
     }
 
@@ -444,6 +464,14 @@ export const deleteOrder = async (req, res) => {
       });
     }
 
+    // Customers can only delete their own pending orders
+    if (req.user?.role === 'customer' && order.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only pending orders can be deleted'
+      });
+    }
+
     await Order.deleteOne({ _id: order._id });
 
     res.status(200).json({
@@ -557,6 +585,15 @@ export const getCustomerOrderById = async (req, res) => {
 export const getOrdersByProductId = async (req, res) => {
   try {
     const { productId } = req.params;
+    const role = req.user?.role;
+
+    // Restrict product-level order history to sellers and admins
+    if (role !== 'seller' && role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Only sellers and administrators can view product orders.'
+      });
+    }
 
     // First, verify product exists by calling seller service
     try {
@@ -591,6 +628,16 @@ export const getOrdersByProductId = async (req, res) => {
 export const getCustomerDetails = async (req, res) => {
   try {
     const { customerId } = req.params;
+    const role = req.user?.role;
+    const userId = req.user?.userId || req.user?.id;
+
+    // Verify tenant ownership for customers
+    if (role === 'customer' && userId !== customerId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. You can only view your own customer details.'
+      });
+    }
     
     // Forward the authorization header to customer service
     const authHeader = req.headers.authorization;
