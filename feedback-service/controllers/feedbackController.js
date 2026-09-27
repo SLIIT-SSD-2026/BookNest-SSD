@@ -5,6 +5,19 @@ import { fetchProductById, syncProductRating } from '../services/productClient.j
 
 const MIN_COMMENT_LENGTH = 3;
 
+// Validate identifiers to prevent path traversal and injection
+const SAFE_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
+const isValidIdentifier = (id) => {
+  if (typeof id !== 'string') return false;
+  const trimmed = id.trim();
+  if (!trimmed || trimmed.length > 100) return false;
+  if (trimmed.includes('/') || trimmed.includes('\\') || trimmed.includes('..')) {
+    return false;
+  }
+  return SAFE_ID_PATTERN.test(trimmed);
+};
+
 const parseRating = (value) => {
   if (value === undefined || value === null) return null;
   const numeric = Number(value);
@@ -70,8 +83,12 @@ export const createFeedback = async (req, res) => {
   try {
     const { orderId, productId, rating, comment } = req.body;
 
-    if (!orderId) {
-      return res.status(400).json({ success: false, message: 'orderId is required' });
+    if (!orderId || !isValidIdentifier(orderId)) {
+      return res.status(400).json({ success: false, message: 'Valid orderId is required' });
+    }
+
+    if (productId && !isValidIdentifier(productId)) {
+      return res.status(400).json({ success: false, message: 'Invalid productId format' });
     }
 
     const numericRating = parseRating(rating);
@@ -82,9 +99,18 @@ export const createFeedback = async (req, res) => {
     const trimmedComment = validateComment(comment, res);
     if (!trimmedComment) return;
 
-    const customer = await fetchCustomerById(req.user.userId);
-    if (!customer) {
-      return res.status(404).json({ success: false, message: 'Customer profile not found' });
+    // Best-effort customer profile lookup — the JWT + requireCustomer middleware
+    // already guarantees the caller is a valid customer. A missing profile (404)
+    // or unreachable customer-service (502/503) must not block feedback submission.
+    let customer = null;
+    try {
+      customer = await fetchCustomerById(req.user.userId);
+    } catch (customerErr) {
+      // Only re-throw on hard unexpected errors (not 404/502/503)
+      if (customerErr.status && customerErr.status < 500 && customerErr.status !== 404) {
+        throw customerErr;
+      }
+      console.warn('[feedback-service] Customer profile lookup skipped:', customerErr.message);
     }
 
     let order = {
@@ -165,10 +191,16 @@ export const getMyFeedbacks = async (req, res) => {
   try {
     const filter = { customerId: req.user.userId };
     if (req.query.orderId) {
-      filter.orderId = req.query.orderId;
+      if (!isValidIdentifier(req.query.orderId)) {
+        return res.status(400).json({ success: false, message: 'Invalid orderId parameter' });
+      }
+      filter.orderId = req.query.orderId.trim();
     }
     if (req.query.productId) {
-      filter.productId = req.query.productId;
+      if (!isValidIdentifier(req.query.productId)) {
+        return res.status(400).json({ success: false, message: 'Invalid productId parameter' });
+      }
+      filter.productId = req.query.productId.trim();
     }
     if (req.query.scope === 'order') {
       filter.productId = { $exists: false };
@@ -192,8 +224,8 @@ export const getMyFeedbacks = async (req, res) => {
 export const getFeedbackForOrder = async (req, res) => {
   try {
     const { orderId } = req.params;
-    if (!orderId) {
-      return res.status(400).json({ success: false, message: 'orderId is required' });
+    if (!orderId || !isValidIdentifier(orderId)) {
+      return res.status(400).json({ success: false, message: 'Valid orderId is required' });
     }
 
     try {
@@ -220,10 +252,16 @@ export const getSellerFeedbacks = async (req, res) => {
   try {
     const filter = { sellerId: req.user.userId };
     if (req.query.orderId) {
-      filter.orderId = req.query.orderId;
+      if (!isValidIdentifier(req.query.orderId)) {
+        return res.status(400).json({ success: false, message: 'Invalid orderId parameter' });
+      }
+      filter.orderId = req.query.orderId.trim();
     }
     if (req.query.productId) {
-      filter.productId = req.query.productId;
+      if (!isValidIdentifier(req.query.productId)) {
+        return res.status(400).json({ success: false, message: 'Invalid productId parameter' });
+      }
+      filter.productId = req.query.productId.trim();
     }
 
     // Seller feed is intended for product-level feedback only.
@@ -244,6 +282,9 @@ export const getSellerFeedbacks = async (req, res) => {
 export const updateFeedback = async (req, res) => {
   try {
     const { feedbackId } = req.params;
+    if (!feedbackId || !isValidIdentifier(feedbackId)) {
+      return res.status(400).json({ success: false, message: 'Invalid feedbackId parameter' });
+    }
     const { rating, comment } = req.body;
 
     const feedback = await Feedback.findById(feedbackId);
@@ -283,6 +324,9 @@ export const updateFeedback = async (req, res) => {
 export const deleteFeedback = async (req, res) => {
   try {
     const { feedbackId } = req.params;
+    if (!feedbackId || !isValidIdentifier(feedbackId)) {
+      return res.status(400).json({ success: false, message: 'Invalid feedbackId parameter' });
+    }
     const feedback = await Feedback.findById(feedbackId);
 
     if (!feedback) {
