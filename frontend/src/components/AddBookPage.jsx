@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { productAPI } from '../utils/api';
+import { endSession, productAPI } from '../utils/api';
 
 export default function AddBookPage() {
   const navigate = useNavigate();
@@ -25,10 +25,9 @@ export default function AddBookPage() {
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
-    
-    if (!token || !userData) {
+
+    if (!userData) {
       navigate('/login');
       return;
     }
@@ -101,9 +100,8 @@ export default function AddBookPage() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  const handleLogout = async () => {
+    await endSession();
     navigate('/');
   };
 

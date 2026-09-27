@@ -15,7 +15,7 @@ export const fetchCustomerById = async (customerId) => {
   }
 
   try {
-    const response = await axios.get(`${baseUrl}/${encodeURIComponent(customerId)}`, {
+    const response = await axios.get(`${baseUrl}/api/customers/${encodeURIComponent(customerId)}`, {
       timeout: 5000
     });
 

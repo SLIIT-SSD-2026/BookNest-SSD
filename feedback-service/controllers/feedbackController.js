@@ -99,9 +99,18 @@ export const createFeedback = async (req, res) => {
     const trimmedComment = validateComment(comment, res);
     if (!trimmedComment) return;
 
-    const customer = await fetchCustomerById(req.user.userId);
-    if (!customer) {
-      return res.status(404).json({ success: false, message: 'Customer profile not found' });
+    // Best-effort customer profile lookup — the JWT + requireCustomer middleware
+    // already guarantees the caller is a valid customer. A missing profile (404)
+    // or unreachable customer-service (502/503) must not block feedback submission.
+    let customer = null;
+    try {
+      customer = await fetchCustomerById(req.user.userId);
+    } catch (customerErr) {
+      // Only re-throw on hard unexpected errors (not 404/502/503)
+      if (customerErr.status && customerErr.status < 500 && customerErr.status !== 404) {
+        throw customerErr;
+      }
+      console.warn('[feedback-service] Customer profile lookup skipped:', customerErr.message);
     }
 
     let order = {

@@ -4,23 +4,27 @@ const API_BASE_URL = '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+export const endSession = async () => {
+  try {
+    await api.post('/auth/logout');
+  } catch {
+    // The cookie may already be missing or expired.
   }
-  return config;
-});
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+};
 
 export const authAPI = {
   login: (credentials) => api.post('/auth/login', credentials),
   register: (userData) => api.post('/auth/register', userData),
   verifyToken: () => api.post('/auth/verify-token'),
+  logout: () => api.post('/auth/logout'),
 };
 
 export const feedbackAPI = {
