@@ -78,24 +78,16 @@ const createSellerProfile = async (user) => {
   }
 };
 
-// Register a new user (customer or seller)
+// Register a new user
 export const registerUser = async (req, res) => {
   try {
-    const { name, email, password, role = 'customer' } = req.body;
+    const { name, email, password } = req.body;
 
     // Check if all required fields are provided
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
         message: 'Please provide all required fields: name, email, password'
-      });
-    }
-
-    // Validate role
-    if (!['customer', 'seller'].includes(role)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Role must be either "customer" or "seller"'
       });
     }
 
@@ -110,10 +102,10 @@ export const registerUser = async (req, res) => {
 
     // Create new user
     const newUser = new User({
-      name,
-      email,
+      name: name.trim(),
+      email: email.trim(),
       password,
-      role
+      role: 'customer'
     });
 
     await newUser.save();
@@ -121,22 +113,15 @@ export const registerUser = async (req, res) => {
     // Fetch the saved user to ensure userId is populated
     const savedUser = await User.findById(newUser._id);
     
-    // Create customer profile if user is a customer
-    if (savedUser.role === 'customer') {
-      await createCustomerProfile(savedUser);
-    }
-    
-    // Create seller profile if user is a seller
-    if (savedUser.role === 'seller') {
-      await createSellerProfile(savedUser);
-    }
+    // Create customer profile
+    await createCustomerProfile(savedUser);
 
     // Generate token
     const token = generateToken(savedUser.userId, savedUser.role);
 
     res.status(201).json({
       success: true,
-      message: `${role.charAt(0).toUpperCase() + role.slice(1)} registered successfully`,
+      message: 'Customer registered successfully',
       data: {
         user: savedUser,
         token
