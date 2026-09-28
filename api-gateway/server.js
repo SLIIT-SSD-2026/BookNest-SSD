@@ -23,9 +23,6 @@ const loginLimiter = rateLimit({
   legacyHeaders: false
 });
 
-// Apply rate limiting to the login endpoint
-app.use('/api/auth/login', loginLimiter);
-
 // Security headers
 app.use(
   helmet.contentSecurityPolicy({
@@ -38,7 +35,7 @@ app.use(
       scriptSrc: ["'self'"],
       scriptSrcAttr: ["'none'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:"],
+      imgSrc: ["'self'", "data:", "https:"],
       connectSrc: [
         "'self'",
         "http://localhost:5000",
