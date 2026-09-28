@@ -124,7 +124,7 @@ const createSellerProfile = async (user) => {
 // Register a new user
 export const registerUser = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, role = 'customer' } = req.body;
 
     // Check if all required fields are provided
     if (!name || !email || !password) {
@@ -170,23 +170,27 @@ export const registerUser = async (req, res) => {
       name: name.trim(),
       email: email.trim(),
       password,
-      role: 'customer'
+      role
     });
 
     await newUser.save();
 
     // Fetch the saved user to ensure userId is populated
     const savedUser = await User.findById(newUser._id);
-
-    // Create customer profile
-    await createCustomerProfile(savedUser);
+    
+    // Create profile according to role
+    if (savedUser.role === 'seller') {
+      await createSellerProfile(savedUser);
+    } else {
+      await createCustomerProfile(savedUser);
+    }
 
     const token = generateToken(savedUser.userId, savedUser.role);
     setAuthCookie(res, token);
 
     res.status(201).json({
       success: true,
-      message: 'Customer registered successfully',
+      message: `${savedUser.role === 'seller' ? 'Seller' : 'Customer'} registered successfully`,
       data: {
         user: savedUser
       }
