@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { authAPI } from '../utils/api';
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -12,6 +14,59 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const successMessage = location.state?.message;
+
+  useEffect(() => {
+    const initializeGoogle = () => {
+      if (window.google?.accounts?.id) {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleGoogleResponse
+        });
+        const buttonContainer = document.getElementById('googleSignInBtn');
+        if (buttonContainer) {
+          window.google.accounts.id.renderButton(buttonContainer, {
+            theme: 'outline',
+            size: 'large',
+            width: '384',
+            text: 'continue_with'
+          });
+        }
+      }
+    };
+
+    if (window.google?.accounts?.id) {
+      initializeGoogle();
+    } else {
+      const interval = setInterval(() => {
+        if (window.google?.accounts?.id) {
+          clearInterval(interval);
+          initializeGoogle();
+        }
+      }, 150);
+      return () => clearInterval(interval);
+    }
+  }, []);
+
+  const handleGoogleResponse = async (response) => {
+    try {
+      setLoading(true);
+      setError('');
+      const res = await authAPI.googleLogin(response.credential);
+      if (res.data.success) {
+        localStorage.setItem('token', res.data.data.token);
+        localStorage.setItem('user', JSON.stringify(res.data.data.user));
+        if (res.data.data.user.role === 'seller') {
+          navigate('/seller-dashboard');
+        } else {
+          navigate('/customer-dashboard');
+        }
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Google sign-in failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChange = (e) => {
     setFormData({
@@ -107,6 +162,14 @@ export default function LoginPage() {
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
+
+          <div className="relative flex py-1 items-center">
+            <div className="grow border-t border-gray-300"></div>
+            <span className="shrink mx-4 text-xs uppercase font-medium text-gray-400">or continue with</span>
+            <div className="grow border-t border-gray-300"></div>
+          </div>
+
+          <div id="googleSignInBtn" className="flex justify-center w-full min-h-[44px]"></div>
         </form>
 
         <div className="mt-6 text-center">
