@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { feedbackAPI, orderAPI } from '../utils/api';
+import { endSession, feedbackAPI, orderAPI } from '../utils/api';
 
 const MIN_FEEDBACK_COMMENT_LENGTH = 3;
 
@@ -56,10 +56,9 @@ export default function FeedbackPage() {
   }, [clearAlerts]);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
     const rawUser = localStorage.getItem('user');
 
-    if (!token || !rawUser) {
+    if (!rawUser) {
       navigate('/login');
       return;
     }
@@ -295,9 +294,8 @@ export default function FeedbackPage() {
     setSearchProductId('');
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  const handleLogout = async () => {
+    await endSession();
     navigate('/');
   };
 

@@ -17,10 +17,9 @@ export default function OrderDetails() {
   const [editedOrder, setEditedOrder] = useState(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
-    
-    if (!token || !userData) {
+
+    if (!userData) {
       navigate('/login');
       return;
     }
