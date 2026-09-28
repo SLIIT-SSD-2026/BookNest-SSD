@@ -10,11 +10,13 @@ dotenv.config();
 const app = express();
 
 app.disable('x-powered-by');
+app.set('trust proxy', 1);
 
-// Authentication rate limiter
+// Authentication rate limiter (max 5 failed attempts per 15 min per IP)
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
+  skipSuccessfulRequests: true,
   message: {
     success: false,
     message: 'Too many login attempts. Please try again later.'
