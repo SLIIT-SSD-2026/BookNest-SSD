@@ -10,11 +10,13 @@ dotenv.config();
 const app = express();
 
 app.disable('x-powered-by');
+app.set('trust proxy', 1);
 
-// Authentication rate limiter
+// Authentication rate limiter (max 5 failed attempts per 15 min per IP)
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
+  skipSuccessfulRequests: true,
   message: {
     success: false,
     message: 'Too many login attempts. Please try again later.'
@@ -22,9 +24,6 @@ const loginLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false
 });
-
-// Apply rate limiting to the login endpoint
-app.use('/api/auth/login', loginLimiter);
 
 // Security headers
 app.use(
@@ -38,7 +37,7 @@ app.use(
       scriptSrc: ["'self'"],
       scriptSrcAttr: ["'none'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:"],
+      imgSrc: ["'self'", "data:", "https:"],
       connectSrc: [
         "'self'",
         "http://localhost:5000",
