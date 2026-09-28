@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
+import crypto from 'crypto';
 import User from '../models/User.js';
 import Blacklist from '../models/Blacklist.js';
 
@@ -69,7 +70,7 @@ const createSellerProfile = async (user) => {
         'Content-Type': 'application/json'
       }
     });
-    
+
   } catch (error) {
     console.error('Error creating seller profile:', error.message);
     if (error.response) {
@@ -112,7 +113,7 @@ export const registerUser = async (req, res) => {
 
     // Fetch the saved user to ensure userId is populated
     const savedUser = await User.findById(newUser._id);
-    
+
     // Create customer profile
     await createCustomerProfile(savedUser);
 
@@ -130,7 +131,7 @@ export const registerUser = async (req, res) => {
 
   } catch (error) {
     console.error('Registration error:', error);
-    
+
     // Handle validation errors
     if (error.name === 'ValidationError') {
       const validationErrors = Object.values(error.errors).map(err => err.message);
@@ -184,7 +185,7 @@ export const loginUser = async (req, res) => {
 
     // Find user by email (need to include password for comparison)
     const user = await User.findOne({ email }).select('+password');
-    
+
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -194,7 +195,7 @@ export const loginUser = async (req, res) => {
 
     // Check password
     const isPasswordValid = await user.comparePassword(password);
-    
+
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
@@ -227,6 +228,81 @@ export const loginUser = async (req, res) => {
   }
 };
 
+// Google OpenID Connect authentication
+export const googleAuth = async (req, res) => {
+  try {
+    const { credential } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({
+        success: false,
+        message: 'Google credential ID token is required'
+      });
+    }
+
+    // Verify Google ID token via Google tokeninfo endpoint
+    const googleResponse = await axios.get(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
+      { timeout: 5000 }
+    );
+    const payload = googleResponse.data;
+
+    // Validate audience against configured Google Client ID
+    const expectedClientId = process.env.GOOGLE_CLIENT_ID;
+    if (expectedClientId && payload.aud !== expectedClientId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid Google token audience'
+      });
+    }
+
+    if (!payload.email || (payload.email_verified !== 'true' && payload.email_verified !== true)) {
+      return res.status(401).json({
+        success: false,
+        message: 'Google email is unverified or unavailable'
+      });
+    }
+
+    const email = payload.email.toLowerCase().trim();
+    const name = payload.name || email.split('@')[0];
+
+    // Find existing user or register new customer
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      const randomPassword = crypto.randomBytes(32).toString('hex');
+      const newUser = new User({
+        name,
+        email,
+        password: randomPassword,
+        role: 'customer'
+      });
+
+      await newUser.save();
+      user = await User.findById(newUser._id);
+      await createCustomerProfile(user);
+    }
+
+    const token = generateToken(user.userId, user.role);
+
+    res.status(200).json({
+      success: true,
+      message: 'Google login successful',
+      data: {
+        user,
+        token
+      }
+    });
+
+  } catch (error) {
+    console.error('Google auth error:', error.response?.data || error.message);
+    res.status(401).json({
+      success: false,
+      message: 'Google authentication failed: invalid or expired token'
+    });
+  }
+};
+
 // Verify token (for other microservices)
 export const verifyToken = async (req, res) => {
   try {
@@ -251,7 +327,7 @@ export const verifyToken = async (req, res) => {
 
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
+
     // Find user
     const user = await User.findOne({ userId: decoded.userId });
     if (!user) {
@@ -277,7 +353,7 @@ export const verifyToken = async (req, res) => {
         message: 'Invalid token.'
       });
     }
-    
+
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
@@ -308,7 +384,7 @@ export const logoutUser = async (req, res) => {
 
     // Verify token to get expiration
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
+
     // Add token to blacklist
     const blacklistedToken = new Blacklist({
       token,
@@ -329,7 +405,7 @@ export const logoutUser = async (req, res) => {
         message: 'Invalid token'
       });
     }
-    
+
     if (error.name === 'TokenExpiredError') {
       return res.status(400).json({
         success: false,

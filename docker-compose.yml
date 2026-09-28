@@ -127,6 +127,7 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - CUSTOMER_SERVICE_URL=${CUSTOMER_SERVICE_URL}
       - SELLER_SERVICE_URL=${SELLER_SERVICE_URL}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
     deploy:
       resources:
         limits:
@@ -172,6 +173,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
     ports:
       - "${EXTERNAL_FRONTEND_PORT}:80"
     container_name: frontend

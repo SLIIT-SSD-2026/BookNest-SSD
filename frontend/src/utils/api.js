@@ -21,6 +21,7 @@ export const authAPI = {
   login: (credentials) => api.post('/auth/login', credentials),
   register: (userData) => api.post('/auth/register', userData),
   verifyToken: () => api.post('/auth/verify-token'),
+  googleLogin: (credential) => api.post('/auth/google', { credential }),
 };
 
 export const feedbackAPI = {
